@@ -2,26 +2,46 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
-	"github.com/lukkigi/parqet-to-ynab/config"
 	"github.com/lukkigi/parqet-to-ynab/util"
 
+	"github.com/briandowns/spinner"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Syncs your YNAB and Parqet budgets and create an adjusting transaction if needed",
+	Long:  `Syncs your YNAB and Parqet budgets and create an adjusting transaction if needed`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("%f", util.GetPortfolioValue(viper.GetString(config.ParqetPortfolioId)))
-		fmt.Println(util.GetBalanceForAccount(viper.GetString(config.YnabBudgetId), viper.GetString(config.YnabInvestingAccountId)))
+		parqetSpinner := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+		ynabBalanceSpinner := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+		ynabTransactionSpinner := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+
+		parqetSpinner.Start()
+		portfolioValue := util.GetPortfolioValue()
+		parqetSpinner.FinalMSG = util.StyleText(util.PinkColor, "Portfolio balance", fmt.Sprintf("%.2f", portfolioValue))
+		parqetSpinner.Stop()
+
+		ynabBalanceSpinner.Start()
+		accountBalance := util.GetBalanceForAccount()
+		ynabBalanceSpinner.FinalMSG = util.StyleText(util.PinkColor, "YNAB account balance", fmt.Sprintf("%.2f", accountBalance))
+		ynabBalanceSpinner.Stop()
+
+		// YNAB expects the value to be in milliunits format
+		difference := int((portfolioValue - accountBalance) * 1000)
+
+		if difference <= 1000 && difference >= -1000 {
+			os.Exit(0)
+		}
+
+		ynabTransactionSpinner.Start()
+		util.AddNewTransaction(strconv.FormatInt(int64(difference), 10))
+		ynabTransactionSpinner.FinalMSG = util.StyleText(util.GreenColor, "Transaction created", fmt.Sprintf("%.2f", portfolioValue-accountBalance))
+		ynabTransactionSpinner.Stop()
 	},
 }
 

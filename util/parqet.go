@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/lukkigi/parqet-to-ynab/config"
+	"github.com/spf13/viper"
 )
 
 const apiUrl = "https://api.tresor.one/v1/portfolios/"
@@ -14,18 +17,13 @@ const apiUrl = "https://api.tresor.one/v1/portfolios/"
 type parqetJsonResponse struct {
 	Portfolio struct {
 		Performance struct {
-			PortfolioValue float32
+			PortfolioValue float64
 		} `json:"performance"`
 	} `json:"portfolio"`
 }
 
-func GetPortfolioValue(id string) float32 {
-	if len(id) == 0 {
-		fmt.Print("Invalid Portfolio ID. Please check your config.")
-		os.Exit(1)
-	}
-
-	response, err := http.Get(fmt.Sprintf("%s%s", apiUrl, id))
+func GetPortfolioValue() float64 {
+	response, err := http.Get(fmt.Sprintf("%s%s", apiUrl, getPortfolioId()))
 
 	if err != nil {
 		fmt.Print(err.Error())
@@ -49,4 +47,15 @@ func GetPortfolioValue(id string) float32 {
 	defer response.Body.Close()
 
 	return result.Portfolio.Performance.PortfolioValue
+}
+
+func getPortfolioId() string {
+	portfolioId := viper.GetString(config.ParqetPortfolioId)
+
+	if len(portfolioId) == 0 {
+		fmt.Println("Invalid Parqet portfolio ID. Please check your config.")
+		os.Exit(1)
+	}
+
+	return portfolioId
 }
